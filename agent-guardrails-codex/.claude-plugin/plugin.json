@@ -1,0 +1,10 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "agent-guardrails-codex",
+  "version": "0.1.0",
+  "description": "agent-guardrails ＋ 把体力活派给外部执行器（codex）的档位规划通道",
+  "author": {
+    "name": "lmy-1219"
+  },
+  "skills": []
+}

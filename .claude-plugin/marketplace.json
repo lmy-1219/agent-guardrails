@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "guardrails",
+  "owner": {
+    "name": "lmy-1219"
+  },
+  "description": "让 AI 编码助手在犯错前被你自己踩过的坑拦一下",
+  "plugins": [
+    {
+      "name": "agent-guardrails",
+      "source": "./agent-guardrails",
+      "description": "让 AI 编码助手在犯错前被你自己踩过的坑拦一下（不含外部执行器派单）"
+    },
+    {
+      "name": "agent-guardrails-codex",
+      "source": "./agent-guardrails-codex",
+      "description": "agent-guardrails ＋ 把体力活派给外部执行器（codex）的档位规划通道"
+    }
+  ]
+}
