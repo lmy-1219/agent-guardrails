@@ -113,6 +113,52 @@ def _播种(家):
     标记.write_text("已播种，⛔ 删掉它会导致下次开窗重新补齐缺失的示范条目\n", encoding="utf-8")
 
 
+def _播种codex配套(家):
+    """把 Codex 专属的规则与角色模板放进插件自己的稳定数据目录。
+
+    ⛔ 不自动写 `<项目>/.codex/agents/` 或 `$CODEX_HOME/agents/`：
+      那两处是会直接改变后续子代理行为的使用者配置；插件在每个项目开窗时擅自写进去，
+      会把“提供模板”变成“替使用者启用一套模型与权限选择”。⇒ 这里只交付可复制的模板。
+
+    ⭐ 不能复用 `.已播种`：老用户升级时它早已存在，新加的 JF-011 与四档模板会永远收不到。
+    也不能每次按“目标缺失”重补：使用者明确删掉一条示范后，它会在下次开窗死而复生。
+    ⇒ 用一份逐文件收据：一个随包文件只交付一次；以后删掉或改掉都尊重使用者。
+    """
+    if not 是codex:
+        return
+    源根 = 插件根 / "codex配套"
+    if not 源根.is_dir():
+        return
+    收据 = 家 / ".codex配套已见.json"
+    if 收据.is_file():
+        已见原 = json.loads(收据.read_text(encoding="utf-8"))
+        if not isinstance(已见原, list) or not all(isinstance(x, str) for x in 已见原):
+            raise ValueError("Codex 配套收据格式不对：%s" % 收据)
+        已见 = set(已见原)
+    else:
+        已见 = set()
+
+    for 源目录, 目标目录, 后缀 in (("种子条目", "active", "*.yaml"),
+                               ("角色模板", "角色模板", "*.toml")):
+        d = 源根 / 源目录
+        if not d.is_dir():
+            continue
+        for p in sorted(d.glob(后缀)):
+            键 = "%s/%s" % (源目录, p.name)
+            if 键 in 已见:
+                continue
+            目标 = 家 / 目标目录 / p.name
+            目标.parent.mkdir(parents=True, exist_ok=True)
+            if not 目标.exists():
+                shutil.copy2(p, 目标)
+            已见.add(键)
+
+    临时 = 收据.with_name(收据.name + ".tmp")
+    临时.write_text(json.dumps(sorted(已见), ensure_ascii=False, indent=2) + "\n",
+                  encoding="utf-8")
+    临时.replace(收据)
+
+
 垫片模板 = '''# -*- coding: utf-8 -*-
 """稳定入口 —— 转发到**此刻这一版**的引擎。由插件在每次开窗时刷新，⛔ 别手改。
 
@@ -240,6 +286,7 @@ def 主():
         _搬旧家(家)          # ⭐ 早期版本把东西存在插件数据目录里，先接过来
         _播种(家)
         if 事件 == "SessionStart":
+            _播种codex配套(家)  # ⭐ 新配套按文件只交付一次；不写使用者的 .codex/agents
             _铺工具(家)      # ⭐ 只在开窗时铺一次，⛔ 不在每次工具调用时写盘
     except Exception:
         # fail-open：⛔ 不许弄坏使用者的会话。

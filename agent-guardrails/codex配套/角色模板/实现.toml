@@ -1,0 +1,16 @@
+# 实现 档 —— 由 agent-guardrails 附带的模板。
+# 📍 用法：把本文件复制到 <你的项目>/.codex/agents/ 或 $CODEX_HOME/agents/
+#   ⚠️ 项目级只在**项目受信任**时才加载。复制后开一个新任务才生效。
+# ⚠️ 两条限制（⛔ 别以为配了就万能）：
+#   ① 每角色**并行数表达不了** —— 只有全局上限，写在 config.toml 的
+#      [agents] max_concurrent_threads_per_session
+#   ② 这里的 sandbox_mode 是**默认值⛔ 不是绝对封锁** ——
+#      父任务临时放宽的权限会继续传给子代理。
+name = "实现"
+description = "真动手改东西。⭐ 唯一允许写的一档 ⇒ 派之前先确认这活真的需要写。"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
+sandbox_mode = "workspace-write"
+developer_instructions = """
+真动手改东西。⭐ 唯一允许写的一档 ⇒ 派之前先确认这活真的需要写。
+"""

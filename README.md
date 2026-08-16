@@ -66,7 +66,7 @@
 |---|---|---|---|
 | **Claude Code** | `agent-guardrails` | —— | ✅ 可用 |
 | **Claude Code**，且你还想**把体力活派给 codex 做** | `agent-guardrails-dispatch` | 一张**档位规划表**：哪个活用哪个模型／推理档位／沙箱权限，写死成配置，⛔ 不靠模型每次临场发挥 | ✅ 可用 |
-| **codex** | `agent-guardrails`（在 codex 货架里） | —— | 🚧 建设中 |
+| **codex** | `agent-guardrails`（在 codex 货架里） | 四档**子代理角色模板** ＋ 一条「起子代理前先选档」的规矩 | ✅ 可用 |
 
 ⚠️ 上面两个 Claude Code 的包**⛔ 别同时装**——它们各自完整，装两个会重复挂钩。
 
@@ -124,14 +124,86 @@ cat ~/.claude/agent-guardrails/_state/触发日志.jsonl
 
 ---
 
+## 安装（codex）
+
+⭐ 实测环境：codex CLI `0.145.0` ＋ Python 3.12 ＋ pyyaml 6。
+
+### 0 · 前置：钩子调的是 `python` 这个名字
+
+```powershell
+python --version
+python -m pip install pyyaml
+```
+
+⚠️ 只装了 `py.exe`、没有可直接运行的 `python` 命令**不够**。
+
+### 1 · 加货架、装插件
+
+```powershell
+codex plugin marketplace add lmy-1219/agent-guardrails
+```
+
+```powershell
+codex plugin add agent-guardrails@guardrails
+```
+
+⚠️ **顺序不能反**：货架还没登记就先 `upgrade` 会报 `marketplace 'guardrails' is not configured`。
+
+### 2 · ⛔⛔ 必须单独信任钩子（这一步跳了等于没装）
+
+开一个新的 codex 任务，输入 `/hooks`，按提示审阅并信任，然后再看一次，**四项都必须是**：
+
+```text
+SessionStart  Installed 1  Active 1
+PreToolUse    Installed 1  Active 1
+PostToolUse   Installed 1  Active 1
+Stop          Installed 1  Active 1
+```
+
+⚠️⚠️ **`Active 0` 时动作照样执行** —— 详情页里 `[ ]` 是**关**、`[x]` 才是开。
+⭐ `codex plugin list` 显示 `installed, enabled` **⛔ 不代表钩子在工作**，必须看 `Active`。
+
+### 3 · 装四档角色（⭐ 这一步要你自己拷）
+
+首次开窗后，四个模板在数据目录的 `角色模板/` 下（抓取／勘察／审计／实现）。
+插件**⛔ 故意不自动写进你的配置目录** —— 那等于替你决定模型和文件权限。
+
+```powershell
+New-Item -ItemType Directory -Force '.codex\agents' | Out-Null
+Copy-Item (Join-Path $env:USERPROFILE '.codex\plugins\data\agent-guardrails-guardrails\角色模板\*.toml') '.codex\agents'
+```
+
+⚠️ 项目级 `.codex/agents` **只在项目受信任时才加载**。拷完开一个新任务。
+
+并行上限写在 `.codex/config.toml`：
+
+```toml
+[agents]
+max_concurrent_threads_per_session = 4
+```
+
+⚠️ **两条限制，⛔ 别以为配了就万能**：
+① **每个角色单独的并行数表达不了**，只有上面这个全局上限；
+② 角色里的 `sandbox_mode` 是**默认值⛔ 不是绝对封锁** —— 你在父任务里临时放宽的权限会传给子代理。
+
+### 4 · 确认它真在岗
+
+⛔ 别只看 `plugin list`。真判据是**故意做一件该被拦的事，看它拦不拦**（照下面「自己写一条规矩」放一条只匹配测试暗号的规矩，让 codex 去创建那个文件，然后确认**文件不存在**）。
+
+---
+
 ## 你的规矩和日志存在哪
 
+**Claude Code**：`~/.claude/agent-guardrails/`
+**codex**：`~/.codex/plugins/data/agent-guardrails-guardrails/`（codex 的数据目录卸载不删，实测过）
+
 ```
-~/.claude/agent-guardrails/
+<上面那个目录>/
   active/     ← 生效中的规矩（装插件时播了 8 条示范，之后归你）
   staging/    ← 待你批准的候选
   _state/     ← 触发日志、会话计数、心跳
   工具/       ← 稳定入口（信/全图景/守望/卡住哨），⛔ 不带版本号
+  角色模板/   ← codex 版专有：四档子代理角色（要你自己拷到 .codex/agents/）
   关系册.yaml ← 同事册（默认全是注释＝关着）
 ```
 
