@@ -62,7 +62,68 @@ def _播种(家):
             目标 = 生效 / p.name
             if not 目标.exists():
                 shutil.copy2(p, 目标)
+    # ⭐ 同事册模板：放进数据目录（可写、升级不丢）。默认全是注释 ⇒ 功能关着，
+    #   这是故意的——独行侠是常态，⛔ 不该硬塞一份假名单。
+    册 = 插件根 / "关系册.yaml.示例"
+    if 册.is_file() and not (家 / "关系册.yaml").exists():
+        shutil.copy2(册, 家 / "关系册.yaml")
     标记.write_text("已播种，⛔ 删掉它会导致下次开窗重新补齐缺失的示范条目\n", encoding="utf-8")
+
+
+垫片模板 = '''# -*- coding: utf-8 -*-
+"""稳定入口 —— 转发到**此刻这一版**的引擎。由插件在每次开窗时刷新，⛔ 别手改。
+
+⭐ 为什么要这一层：插件的安装路径**带版本号**（…/<插件>/<版本>/），升级一次就变
+   ⇒ 任何写死那个路径的命令，升级后当场失效。
+   而数据目录（本文件所在处）**没有版本号、升级不动** ⇒ 拿它当稳定入口。
+"""
+import pathlib
+import runpy
+import sys
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+家 = pathlib.Path(__file__).resolve().parent.parent
+指针 = 家 / ".引擎路径"
+if not 指针.is_file():
+    print("⛔ 找不到引擎位置指针（{}）——开一个新窗即可自动重建。".format(指针))
+    sys.exit(1)
+目标 = pathlib.Path(指针.read_text(encoding="utf-8").strip()) / "<<引擎名>>"
+if not 目标.is_file():
+    print("⛔ 引擎不在了：{} ——插件可能刚升级过，开一个新窗即可重建指针。".format(目标))
+    sys.exit(1)
+sys.argv = [str(目标)] + sys.argv[1:]
+runpy.run_path(str(目标), run_name="__main__")
+'''
+
+# ⭐ 哪些引擎需要「使用者/模型自己敲命令」调用 ⇒ 就需要一个稳定入口。
+#   ⛔ 哨.py 不在其中：它只被钩子调，钩子命令里有 ${CLAUDE_PLUGIN_ROOT}，⛔ 不需要垫片。
+要垫片的 = ("信.py", "全图景.py", "守望.py", "卡住哨.py")
+
+
+def _铺工具(家):
+    """在**稳定路径**上铺一层转发口，并把当前引擎位置写进指针。
+
+    ⚠️⚠️ 这一层是补一个真缺口，⛔ 不是锦上添花：
+      没有它，跨窗信箱的**发信那一半在插件形态下完全没有入口**——
+      模型敲不出 信.py 的路径（带版本号），⇒ 收信提醒照常响、而没有人发得出信。
+      ⭐ 「装了、测试也过、但真实路径上没有任何调用者」＝ 装饰。
+    ⭐ 每次开窗都重写指针 ⇒ 升级后**自愈**，⛔ 不用使用者做任何事。
+    """
+    工具 = 家 / "工具"
+    工具.mkdir(parents=True, exist_ok=True)
+    (家 / ".引擎路径").write_text(str(插件根 / "engine"), encoding="utf-8")
+    for 名 in 要垫片的:
+        if not (插件根 / "engine" / 名).is_file():
+            continue                      # 精简版没装的（如 codex派单）就不铺
+        p = 工具 / 名
+        # ⛔ 不用 % 格式化：模板里本来就有别的 %s，替换时会撞车
+        #   （2026-08-16 实测栽过一次：抛 TypeError，被 fail-open 静默吞掉 ⇒ 工具目录一直是空的）
+        文 = 垫片模板.replace("<<引擎名>>", 名)
+        if not p.is_file() or p.read_text(encoding="utf-8") != 文:
+            p.write_text(文, encoding="utf-8")
 
 
 def _依赖齐吗():
@@ -103,13 +164,26 @@ def 主():
     try:
         家.mkdir(parents=True, exist_ok=True)
         _播种(家)
+        if 事件 == "SessionStart":
+            _铺工具(家)      # ⭐ 只在开窗时铺一次，⛔ 不在每次工具调用时写盘
     except Exception:
-        pass  # fail-open：播种失败也不许弄坏用户的会话
+        # fail-open：⛔ 不许弄坏使用者的会话。
+        # ⚠️⚠️ 但**⛔ 不许静默**——2026-08-16 实测：这里吞掉一个 TypeError，
+        #   结果「铺工具」一直没成功、工具目录始终是空的，而一切看起来都正常。
+        #   ⇒ 把出错原文落盘，让「没铺成」查得出来。
+        try:
+            import traceback
+            (家 / "适配层错误.log").write_text(traceback.format_exc(), encoding="utf-8")
+        except Exception:
+            pass
 
     # ⭐ 只在**没有显式设定**时才填，⛔ 不覆盖使用者自己的选择（也让回归测试能照常接管）
     os.environ.setdefault("WORLDBOOK_STATE_DIR", str(家 / "_state"))
     os.environ.setdefault("WORLDBOOK_ACTIVE_DIR", str(家 / "active"))
     os.environ.setdefault("WORLDBOOK_STAGING_DIR", str(家 / "staging"))
+    # ⭐ 同事册：插件形态下它住在数据目录（可写、升级不丢），⛔ 不在引擎目录
+    os.environ.setdefault("WORLDBOOK_关系册", str(家 / "关系册.yaml"))
+    os.environ.setdefault("WORLDBOOK_工具目录", str(家 / "工具"))
 
     哨 = 插件根 / "engine" / "哨.py"
     if not 哨.is_file():
