@@ -35,12 +35,39 @@ if hasattr(sys.stderr, "reconfigure"):
 
 
 def _状态家():
-    """状态该落哪。⭐ 优先官方的每插件数据目录，⛔ 不落插件目录本身。"""
-    d = os.environ.get("CLAUDE_PLUGIN_DATA")
-    if d:
-        return Path(d)
-    # 退路：没跑在插件里（本地直接调、或平台版本较老）⇒ 落用户目录，⛔ 仍不落插件目录
-    return Path.home() / ".claude" / "agent-guardrails-data"
+    """使用者的规矩与日志该落哪。
+
+    ⛔ **不落插件目录**（安装路径带版本号，升级＝换目录 ⇒ 写进去的等于丢）。
+    ⛔ **也不落官方的每插件数据目录 `CLAUDE_PLUGIN_DATA`** ——
+      ⚠️⚠️ 2026-08-16 实测：`plugin uninstall` 会把那个目录**整个删掉**
+        ⇒ 使用者攒了几个月的规矩、触发日志、误报统计**一并消失**。
+        而卸载常常只是为了排查问题（装回来就好），代价不该是清空资产。
+    ⭐ 这套东西的全部价值就是「**你自己长出来的那些规矩**」——它是使用者的资产，
+      ⛔ 不该挂在插件的生命周期上。⇒ 放一个平台不会碰的固定位置。
+    """
+    return Path.home() / ".claude" / "agent-guardrails"
+
+
+def _搬旧家(新家):
+    """把早期版本存在插件数据目录里的东西搬过来。⭐ 只搬一次，⛔ 不覆盖新家已有的。"""
+    旧 = os.environ.get("CLAUDE_PLUGIN_DATA")
+    if not 旧:
+        return
+    旧 = Path(旧)
+    if not (旧 / "active").is_dir() or (新家 / ".已搬家").exists():
+        return
+    for 子 in ("active", "staging", "_state", "工具"):
+        源, 目 = 旧 / 子, 新家 / 子
+        if 源.is_dir():
+            目.mkdir(parents=True, exist_ok=True)
+            for p in 源.rglob("*"):
+                if p.is_file() and not (目 / p.relative_to(源)).exists():
+                    (目 / p.relative_to(源)).parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(p, 目 / p.relative_to(源))
+    for f in ("关系册.yaml", ".已播种"):
+        if (旧 / f).is_file() and not (新家 / f).exists():
+            shutil.copy2(旧 / f, 新家 / f)
+    (新家 / ".已搬家").write_text("从插件数据目录搬来过一次\n", encoding="utf-8")
 
 
 def _播种(家):
@@ -163,6 +190,7 @@ def 主():
     家 = _状态家()
     try:
         家.mkdir(parents=True, exist_ok=True)
+        _搬旧家(家)          # ⭐ 早期版本把东西存在插件数据目录里，先接过来
         _播种(家)
         if 事件 == "SessionStart":
             _铺工具(家)      # ⭐ 只在开窗时铺一次，⛔ 不在每次工具调用时写盘
