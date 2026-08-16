@@ -102,7 +102,14 @@ def _解析目标项目(名或路径):
     名单 = [名或路径]
     try:
         import yaml
-        册文 = Path(__file__).resolve().parent.parent / "关系册.yaml"
+        # ⚠️⚠️ 2026-08-16 由 codex 窗实测抓出：这里原来只按「引擎目录的上一级」找册子，
+        #   ⛔ 没读适配层设的 `WORLDBOOK_关系册` ⇒ 插件形态下册子在**数据目录**里，这儿找不到
+        #   ⇒ 现象很阴：开窗注入同事册**正常**、给绝对路径发信**正常**，
+        #     唯独「用册子里的正名/别名发信」找不到目标 —— 三条路里坏了一条，最难察觉。
+        # ⭐ 本窗当时只给 哨.py 加了这个环境变量、漏了本文件 ——
+        #   正是 codex 上一轮警告过的「同一件事在两个文件里判两遍，迟早不一致」，我当场犯了。
+        册文 = Path(os.environ.get("WORLDBOOK_关系册")
+                    or (Path(__file__).resolve().parent.parent / "关系册.yaml"))
         if 册文.is_file():
             for 正名, 项 in ((yaml.safe_load(册文.read_text(encoding="utf-8")) or {}).get("项目") or {}).items():
                 别名 = [str(x) for x in ((项 or {}).get("别名") or [正名])]

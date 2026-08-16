@@ -310,4 +310,15 @@ if __name__ == "__main__":
     except SystemExit:
         raise                  # 引擎自己 sys.exit(0)/(2)，原样透传——⛔ 别吞，拦截靠它
     except Exception:
-        sys.exit(0)            # fail-open 兜底
+        # fail-open（入口坏了也不锁死使用者），但⛔ 不许静默：把原始堆栈留在稳定数据目录。
+        # 日志本身若也写不了，才只能退出；这里不能为了报错再把会话弄坏。
+        try:
+            import traceback
+            家 = _状态家()
+            家.mkdir(parents=True, exist_ok=True)
+            with (家 / "适配层错误.log").open("a", encoding="utf-8", newline="\n") as f:
+                f.write(traceback.format_exc())
+                f.write("\n")
+        except Exception:
+            pass
+        sys.exit(0)
