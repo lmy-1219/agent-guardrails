@@ -17,6 +17,7 @@
    ⇒ 把风险摁在这一个文件名上；其余文件仍是中文（它们只被 Python 打开，⛔ 不过 shell）。
 """
 import json
+import io
 import os
 import runpy
 import shutil
@@ -31,25 +32,40 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-插件根 = Path(__file__).resolve().parent.parent
+# ⭐ Codex 会同时给 `PLUGIN_ROOT` 和兼容用的 `CLAUDE_PLUGIN_ROOT`。
+#   ⇒ ⛔ 不能拿「没有 CLAUDE_PLUGIN_ROOT」判断宿主；实测那会让 Codex 永远误判成 Claude。
+#   Claude Code 不给 `PLUGIN_ROOT`，所以它本身就是可靠的 Codex 标记。
+是codex = bool(os.environ.get("PLUGIN_ROOT"))
+插件根 = (Path(os.environ["PLUGIN_ROOT"]).resolve()
+          if 是codex else Path(__file__).resolve().parent.parent)
 
 
 def _状态家():
     """使用者的规矩与日志该落哪。
 
     ⛔ **不落插件目录**（安装路径带版本号，升级＝换目录 ⇒ 写进去的等于丢）。
-    ⛔ **也不落官方的每插件数据目录 `CLAUDE_PLUGIN_DATA`** ——
+    Claude Code：⛔ **也不落官方的每插件数据目录 `CLAUDE_PLUGIN_DATA`** ——
       ⚠️⚠️ 2026-08-16 实测：`plugin uninstall` 会把那个目录**整个删掉**
         ⇒ 使用者攒了几个月的规矩、触发日志、误报统计**一并消失**。
         而卸载常常只是为了排查问题（装回来就好），代价不该是清空资产。
+    Codex：⭐ 2026-08-16 在 0.145.0 上重装、卸载后分别实测，`PLUGIN_DATA`
+      和里面的中文文件都还在 ⇒ 就用宿主给的稳定目录。若宿主没给（异常环境），
+      才退到 `$CODEX_HOME/agent-guardrails/`，⛔ 不写死用户名或盘符。
     ⭐ 这套东西的全部价值就是「**你自己长出来的那些规矩**」——它是使用者的资产，
       ⛔ 不该挂在插件的生命周期上。⇒ 放一个平台不会碰的固定位置。
     """
+    if 是codex:
+        数据 = os.environ.get("PLUGIN_DATA")
+        if 数据:
+            return Path(数据)
+        return Path(os.environ.get("CODEX_HOME") or (Path.home() / ".codex")) / "agent-guardrails"
     return Path.home() / ".claude" / "agent-guardrails"
 
 
 def _搬旧家(新家):
     """把早期版本存在插件数据目录里的东西搬过来。⭐ 只搬一次，⛔ 不覆盖新家已有的。"""
+    if 是codex:
+        return                         # Codex 的新家本来就是 PLUGIN_DATA，⛔ 自己搬自己
     旧 = os.environ.get("CLAUDE_PLUGIN_DATA")
     if not 旧:
         return
@@ -105,6 +121,7 @@ def _播种(家):
    而数据目录（本文件所在处）**没有版本号、升级不动** ⇒ 拿它当稳定入口。
 """
 import pathlib
+import os
 import runpy
 import sys
 
@@ -113,6 +130,19 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 家 = pathlib.Path(__file__).resolve().parent.parent
+# ⭐ 稳定入口是使用者/模型另起一个 shell 调的，⛔ 不继承开窗 hook 进程里的环境变量。
+#   ⇒ 宿主翻译也必须在这里补一次，否则 Codex 下的 信.py 会退回找 `.claude/`，
+#      文件明明装着、命令也跑了，却找不到任何只带 `.codex/` 的项目。
+配置目录名 = "<<配置目录名>>"
+宿主用户目录 = (pathlib.Path(os.environ.get("CODEX_HOME") or (pathlib.Path.home() / ".codex"))
+                if 配置目录名 == ".codex" else (pathlib.Path.home() / ".claude"))
+os.environ.setdefault("WORLDBOOK_配置目录名", 配置目录名)
+os.environ.setdefault("WORLDBOOK_宿主用户目录", str(宿主用户目录))
+os.environ.setdefault("WORLDBOOK_STATE_DIR", str(家 / "_state"))
+os.environ.setdefault("WORLDBOOK_ACTIVE_DIR", str(家 / "active"))
+os.environ.setdefault("WORLDBOOK_STAGING_DIR", str(家 / "staging"))
+os.environ.setdefault("WORLDBOOK_关系册", str(家 / "关系册.yaml"))
+os.environ.setdefault("WORLDBOOK_工具目录", str(家 / "工具"))
 指针 = 家 / ".引擎路径"
 if not 指针.is_file():
     print("⛔ 找不到引擎位置指针（{}）——开一个新窗即可自动重建。".format(指针))
@@ -148,7 +178,8 @@ def _铺工具(家):
         p = 工具 / 名
         # ⛔ 不用 % 格式化：模板里本来就有别的 %s，替换时会撞车
         #   （2026-08-16 实测栽过一次：抛 TypeError，被 fail-open 静默吞掉 ⇒ 工具目录一直是空的）
-        文 = 垫片模板.replace("<<引擎名>>", 名)
+        文 = (垫片模板.replace("<<引擎名>>", 名)
+                         .replace("<<配置目录名>>", ".codex" if 是codex else ".claude"))
         if not p.is_file() or p.read_text(encoding="utf-8") != 文:
             p.write_text(文, encoding="utf-8")
 
@@ -230,18 +261,26 @@ def 主():
     os.environ.setdefault("WORLDBOOK_工具目录", str(家 / "工具"))
     # ⭐⭐ 宿主翻译层：告诉引擎「这台宿主的项目配置在哪个目录名下、用户目录在哪」。
     #   ⇒ **一份引擎跑两个宿主**，⛔ 不复制引擎（本仓原罪就是复制）。
-    #   ⛔ 这里⛔ 不写死 .claude —— 有 codex 的插件根变量就认 codex 的一套。
-    是codex = bool(os.environ.get("PLUGIN_ROOT") and not os.environ.get("CLAUDE_PLUGIN_ROOT"))
+    #   ⛔ 这里⛔ 不写死 .claude —— 有 Codex 专属的 PLUGIN_ROOT 就认 codex 的一套。
     os.environ.setdefault("WORLDBOOK_配置目录名", ".codex" if 是codex else ".claude")
     os.environ.setdefault("WORLDBOOK_宿主用户目录",
                           str(Path(os.environ.get("CODEX_HOME") or (Path.home() / ".codex"))
                               if 是codex else (Path.home() / ".claude")))
-    # ⭐ 引擎认 CLAUDE_PROJECT_DIR 当显式锚点 ⇒ 在 codex 上把它翻译过去，⛔ 不改引擎
+    # ⭐ 引擎认 CLAUDE_PROJECT_DIR 当显式锚点 ⇒ 在 codex 上把它翻译过去，⛔ 不改引擎。
+    #   Codex 0.145.0 实测没有 CODEX_PROJECT_DIR / PROJECT_DIR；等价值在 hook stdin 的 `cwd`。
+    #   这里读一次再原样放回去，保证后面的哨.py 仍能读到完整 hook 输入。
     if 是codex and not os.environ.get("CLAUDE_PROJECT_DIR"):
-        for k in ("CODEX_PROJECT_DIR", "PROJECT_DIR"):
-            if os.environ.get(k):
-                os.environ["CLAUDE_PROJECT_DIR"] = os.environ[k]
-                break
+        try:
+            buf = getattr(sys.stdin, "buffer", None)
+            原始输入 = (buf.read().decode("utf-8", "replace")
+                        if buf is not None else sys.stdin.read())
+            sys.stdin = io.StringIO(原始输入)
+            钩子输入 = json.loads(原始输入) if 原始输入.strip() else {}
+            项目根 = 钩子输入.get("cwd") if isinstance(钩子输入, dict) else None
+            os.environ["CLAUDE_PROJECT_DIR"] = str(Path(项目根 or Path.cwd()).resolve())
+        except Exception:
+            # hook 命令本身就在会话 cwd 下执行；stdin 坏了时退到这个已实测的等价值。
+            os.environ["CLAUDE_PROJECT_DIR"] = str(Path.cwd().resolve())
 
     # ⭐ 开窗自检：⛔ 不在岗就**明说**，⛔ 不许悄悄空转（沉默不许有两种含义）。
     #   只在 SessionStart 说一次；⛔ 不在每次工具调用时刷屏——噪音毁信用比不提醒更糟。

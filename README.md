@@ -42,7 +42,7 @@
 
 ⭐ **信落盘、门铃不落盘** —— 信是耐久载体，敲门只是把人叫醒。⛔ 别把内容写进敲门消息里。
 
-**打开同事册**：编辑 `~/.claude/plugins/data/<插件名>-<货架名>/关系册.yaml`
+**打开同事册**：编辑 `~/.claude/agent-guardrails/关系册.yaml`
 （装插件时会放一份带注释的模板进去），把项目和关系填上即可。填完开个新窗就生效。
 
 ⛔ 不填也没关系——**独行侠是常态**，不填就只是不注入，⛔ 不会报错也⛔ 不会打扰你。
@@ -56,15 +56,24 @@
 | `守望.py` | 盯住指定文件/目录，别的窗动了它就提醒 | 手动跑 |
 
 它们都在**稳定路径**下（⛔ 不带版本号，升级不会失效）：
-`~/.claude/plugins/data/<插件名>-<货架名>/工具/`
+`~/.claude/agent-guardrails/工具/`
 
 ## 三个版本
 
-| 版本 | 内容 | 状态 |
-|---|---|---|
-| `agent-guardrails` | 引擎 ＋ 四个挂点 ＋ 5 条示范条目 | ✅ 可用 |
-| `agent-guardrails-codex` | 上面全部 ＋ 把体力活派给 codex 的**档位规划通道**（哪个活用哪个模型/档位/沙箱，写成一张表，⛔ 不靠模型每次临场发挥） | ✅ 可用 |
-| codex 原生版 | 跑在 codex 自己的框架上，档位规划改用它的子代理配置 | 🚧 建设中 |
+⭐ **先看「你用的是哪个软件」，⛔ 别看名字后缀。**
+
+| 你用的是 | 装哪个 | 它多了什么 | 状态 |
+|---|---|---|---|
+| **Claude Code** | `agent-guardrails` | —— | ✅ 可用 |
+| **Claude Code**，且你还想**把体力活派给 codex 做** | `agent-guardrails-dispatch` | 一张**档位规划表**：哪个活用哪个模型／推理档位／沙箱权限，写死成配置，⛔ 不靠模型每次临场发挥 | ✅ 可用 |
+| **codex** | `agent-guardrails`（在 codex 货架里） | —— | 🚧 建设中 |
+
+⚠️ 上面两个 Claude Code 的包**⛔ 别同时装**——它们各自完整，装两个会重复挂钩。
+
+⚠️ **`-dispatch` 那个是 Claude Code 的包**，⛔ 不是「codex 版」。
+它的意思是「**我在 Claude Code 里干活，但把体力活派出去**」。
+真正跑在 codex 里的那一版在 codex 货架上，也叫 `agent-guardrails`——
+⭐ 两个货架是分开的，**同名⛔ 不冲突**，你用哪个软件就装哪个货架上的。
 
 ---
 
@@ -92,7 +101,7 @@ claude plugin install agent-guardrails@guardrails
 要带 codex 派单通道的，把上面第二条换成：
 
 ```bash
-claude plugin install agent-guardrails-codex@guardrails
+claude plugin install agent-guardrails-dispatch@guardrails
 ```
 
 ⛔ 两个别同时装——它们各自完整，装两个会重复挂钩。
@@ -110,7 +119,7 @@ claude plugin list
 看到 `Status: √ enabled` 即可。想看它自己写的心跳：
 
 ```bash
-cat ~/.claude/plugins/data/agent-guardrails-guardrails/_state/触发日志.jsonl
+cat ~/.claude/agent-guardrails/_state/触发日志.jsonl
 ```
 
 ---
