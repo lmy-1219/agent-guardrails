@@ -32,7 +32,7 @@
 
 ## 多窗联动（多个 AI 窗口之间互相通气）
 
-同时开好几个窗做不同项目时，**「我改的东西会不会动到其他窗口/兄弟项目的模块」全靠人记**——这套东西把它机械化。
+同时开好几个窗做不同项目时，**「我改的东西会不会坑到别人」全靠人记**——这套东西把它机械化。
 
 | 半边 | 它做什么 | 要不要配 |
 |---|---|---|
@@ -42,7 +42,7 @@
 
 ⭐ **信落盘、门铃不落盘** —— 信是耐久载体，敲门只是把人叫醒。⛔ 别把内容写进敲门消息里。
 
-**打开同事册**：编辑 `~/.claude/agent-guardrails/关系册.yaml`
+**打开同事册**：编辑数据目录里的 `关系册.yaml`（位置见下面「安装」那张表——⚠️ Claude 和 codex **不是同一个目录**）
 （装插件时会放一份带注释的模板进去），把项目和关系填上即可。填完开个新窗就生效。
 
 ⛔ 不填也没关系——**独行侠是常态**，不填就只是不注入，⛔ 不会报错也⛔ 不会打扰你。
@@ -56,7 +56,7 @@
 | `守望.py` | 盯住指定文件/目录，别的窗动了它就提醒 | 手动跑 |
 
 它们都在**稳定路径**下（⛔ 不带版本号，升级不会失效）：
-`~/.claude/agent-guardrails/工具/`
+数据目录的 `工具/` 下（位置见「安装」那张表）。
 
 ## 三个版本
 
@@ -77,118 +77,79 @@
 
 ---
 
-## 安装（Claude Code）
+## 安装 —— 让你的 AI 窗口代劳
 
-### 0 · 前置：Python 3 ＋ pyyaml
+⭐ **⛔ 不用自己敲命令**：把下面两段依次粘进你的 AI 窗口就行。
 
-```bash
-python -m pip install pyyaml
-```
+⚠️ 但有两步 **AI 替不了、必须你亲自做**：装完要**开一个新窗**（插件只在新会话加载）；
+codex 还要你**亲自信任钩子**。
 
-⚠️ **这一步不能跳**。缺了 pyyaml，规矩**一条都不会加载**——插件照样装得上、钩子照样在跑、
-日志照样有记录，**就是永远不叫**。（装完开窗时插件会明确告诉你它没在岗，⛔ 不会闷着。）
+### 第一段 · 粘这个
 
-### 1 · 加货架、装插件
-
-```bash
-claude plugin marketplace add lmy-1219/agent-guardrails
-```
-
-```bash
-claude plugin install agent-guardrails@guardrails
-```
-
-要带 codex 派单通道的，把上面第二条换成：
-
-```bash
-claude plugin install agent-guardrails-dispatch@guardrails
-```
-
-⛔ 两个别同时装——它们各自完整，装两个会重复挂钩。
-
-### 2 · 重开一个窗
-
-插件在**新会话**才加载。开窗后你会看到几段常驻纪律被注入——**看到了就是装上了**。
-
-### 3 · 确认它真在岗
-
-```bash
-claude plugin list
-```
-
-看到 `Status: √ enabled` 即可。想看它自己写的心跳：
-
-```bash
-cat ~/.claude/agent-guardrails/_state/触发日志.jsonl
-```
-
----
-
-## 安装（codex）
-
-⭐ 实测环境：codex CLI `0.145.0` ＋ Python 3.12 ＋ pyyaml 6。
-
-### 0 · 前置：钩子调的是 `python` 这个名字
-
-```powershell
-python --version
-python -m pip install pyyaml
-```
-
-⚠️ 只装了 `py.exe`、没有可直接运行的 `python` 命令**不够**。
-
-### 1 · 加货架、装插件
-
-```powershell
-codex plugin marketplace add lmy-1219/agent-guardrails
-```
-
-```powershell
-codex plugin add agent-guardrails@guardrails
-```
-
-⚠️ **顺序不能反**：货架还没登记就先 `upgrade` 会报 `marketplace 'guardrails' is not configured`。
-
-### 2 · ⛔⛔ 必须单独信任钩子（这一步跳了等于没装）
-
-开一个新的 codex 任务，输入 `/hooks`，按提示审阅并信任，然后再看一次，**四项都必须是**：
+> 示例是 **codex 原生版**。换版本只改**加粗**处，对照下面那张表。
 
 ```text
-SessionStart  Installed 1  Active 1
-PreToolUse    Installed 1  Active 1
-PostToolUse   Installed 1  Active 1
-Stop          Installed 1  Active 1
+请帮我把这个公开仓的插件装到本机：https://github.com/lmy-1219/agent-guardrails
+要装的是 【agent-guardrails@guardrails】，⛔ 别装成另一个包。
+
+① 先只读仓里 README 的「安装」一节和清单文件，确认包名与版本。⛔ 不许改仓里任何文件。
+② 逐条检查环境，把**原样输出**给我看：
+     【codex】 --version
+     python --version
+     python -c "import yaml; print(yaml.__version__)"
+   ⚠️ 只有 py.exe 或 python3 【不算数】——钩子命令调的就是 `python` 这个名字。
+③ 缺东西 ⇒ ⛔ 不许静默跳过，⛔ 不许拿「差不多的东西存在」糊弄我。
+   先说清缺什么、准备跑什么命令，【征得我同意再装】。
+   （缺 codex 命令行就用官方安装器，⛔ 别用第三方来源。）
+④ 齐了再依次执行：
+     【codex】 plugin marketplace add lmy-1219/agent-guardrails
+     【codex】 plugin 【add】 【agent-guardrails@guardrails】
+     【codex】 plugin list
+   货架以前加过 ⇒ 先跑 marketplace upgrade guardrails 再装。
+⑤ ⛔ 装完不许说「已经在岗」。命令成功 ≠ 它在工作。
+   请明确告诉我：下一步要我自己做什么。
+⑥ ⛔ 不许改我的项目文件，⛔ 不许写我的配置目录。
 ```
 
-⚠️⚠️ **`Active 0` 时动作照样执行** —— 详情页里 `[ ]` 是**关**、`[x]` 才是开。
-⭐ `codex plugin list` 显示 `installed, enabled` **⛔ 不代表钩子在工作**，必须看 `Active`。
+### 第二段 · 先由你自己做一步，再粘给**新窗**
 
-### 3 · 装四档角色（⭐ 这一步要你自己拷）
+| 你用的是 | 你要亲自做的 |
+|---|---|
+| **Claude Code** | 开一个新窗。看到几段常驻纪律被注入 ＝ 装上了 |
+| **codex** | 开一个新任务 → 输入 `/hooks` → 审阅并信任 → 再看一次，**四项必须都是 `Active 1`** |
 
-首次开窗后，四个模板在数据目录的 `角色模板/` 下（抓取／勘察／审计／实现）。
-插件**⛔ 故意不自动写进你的配置目录** —— 那等于替你决定模型和文件权限。
+⚠️⚠️ codex 上 **`Active 0` 时动作照样执行**，而 `plugin list` 仍显示 `enabled`
+⇒ ⛔ 别拿「装上了」当「在工作」。
 
-```powershell
-New-Item -ItemType Directory -Force '.codex\agents' | Out-Null
-Copy-Item (Join-Path $env:USERPROFILE '.codex\plugins\data\agent-guardrails-guardrails\角色模板\*.toml') '.codex\agents'
+```text
+插件已装好（codex：我已在 /hooks 完成信任）。请做验收，⛔ 别只看 plugin list：
+
+① 报告数据目录里有没有 active/ staging/ _state/ 工具/ 关系册.yaml
+   【以及 角色模板/】。目录位置见 README 那张表。
+② ⭐ 做一次真拦截（这是唯一算数的判据）：
+   在 active/ 放一条只匹配某个唯一暗号的规矩，然后你自己去创建那个暗号文件
+   ⇒ 必须【被拦住】且【文件确实不存在】。⛔ 被拦后不许重试。验完删掉这条规矩。
+③ 确认拦截理由是完整中文、⛔ 无乱码、⛔ 没被截断。
+④ 【仅 codex】先问我要装到「当前项目」还是「全局」，等我回答再把
+   角色模板/*.toml 复制到 .codex/agents/。⛔ 不许覆盖同名文件、⛔ 不许改我的 config.toml。
+⑤ 逐项报告：真跑过的命令与输出／拦没拦住／暗号文件在不在／有没有遗留问题。
+   ⛔ 任何一项没做到就直说，⛔ 不许用「都完成了」盖过去。
 ```
 
-⚠️ 项目级 `.codex/agents` **只在项目受信任时才加载**。拷完开一个新任务。
+### 【加粗处】怎么换
 
-并行上限写在 `.codex/config.toml`：
+| 加粗字段 | **codex 原生版**（上面的示例） | Claude Code | Claude Code ＋ 派单 |
+|---|---|---|---|
+| 平台命令 | **`codex`** | `claude` | `claude` |
+| 装插件的子命令 | **`plugin add`** | `plugin install` | `plugin install` |
+| 包名 | **`agent-guardrails@guardrails`** | `agent-guardrails@guardrails` | `agent-guardrails-dispatch@guardrails` |
+| 装完还要做什么 | **开新任务 ＋ `/hooks` 信任** | **只**开新窗（⛔ 没有信任步骤） | 同左 |
+| 数据目录 | **`~/.codex/plugins/data/agent-guardrails-guardrails/`** | `~/.claude/agent-guardrails/` | `~/.claude/agent-guardrails/` |
+| 有没有 `角色模板/` | **✅ 有**（四档子代理角色） | ⛔ 无 | ⛔ 无（档位表叫 `工作流.yaml.示例`） |
+| 第二段的第 ④ 步 | **要做** | ⛔ 整条跳过 | ⛔ 整条跳过 |
 
-```toml
-[agents]
-max_concurrent_threads_per_session = 4
-```
-
-⚠️ **两条限制，⛔ 别以为配了就万能**：
-① **每个角色单独的并行数表达不了**，只有上面这个全局上限；
-② 角色里的 `sandbox_mode` 是**默认值⛔ 不是绝对封锁** —— 你在父任务里临时放宽的权限会传给子代理。
-
-### 4 · 确认它真在岗
-
-⛔ 别只看 `plugin list`。真判据是**故意做一件该被拦的事，看它拦不拦**（照下面「自己写一条规矩」放一条只匹配测试暗号的规矩，让 codex 去创建那个文件，然后确认**文件不存在**）。
+⚠️ **两个 Claude Code 的包名只差一个词** —— `agent-guardrails` 和 `agent-guardrails-dispatch`，⛔ 别装错。
+⭐ 三个版本**⛔ 别同时装**：它们各自完整，装两个会重复挂钩。
 
 ---
 
@@ -219,16 +180,17 @@ max_concurrent_threads_per_session = 4
 
 ## 升级 / 卸载
 
-```bash
-claude plugin update agent-guardrails@guardrails
-```
+⚠️ 两边的**子命令名不一样**，⛔ 别照抄错：
 
-```bash
-claude plugin uninstall agent-guardrails@guardrails
-```
+| | Claude Code | codex |
+|---|---|---|
+| **升级** | `claude plugin update <包名>@guardrails` | `codex plugin marketplace upgrade guardrails`<br>然后 `codex plugin add <包名>@guardrails` |
+| **卸载** | `claude plugin uninstall <包名>@guardrails` | `codex plugin remove <包名>@guardrails` |
 
-⭐ 卸载**不会碰**你的规矩和日志（它们在 `~/.claude/agent-guardrails/`，⛔ 不在插件目录里）。
-要彻底清干净，手动删那个目录即可。
+⭐ **升级和卸载都⛔ 不会碰你的规矩和日志**（两边实测过）。
+要彻底清干净，手动删数据目录即可（位置见「安装」那张表）。
+
+⚠️ codex 升级后要**开一个新任务**才会指向新版本；钩子若有变化还要再 `/hooks` 审阅一次。
 
 ---
 
