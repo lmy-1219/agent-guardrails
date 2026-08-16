@@ -153,40 +153,56 @@ def _铺工具(家):
             p.write_text(文, encoding="utf-8")
 
 
-def _依赖齐吗():
-    """引擎靠 pyyaml 读条目。⛔ 缺了它，护栏是**完全静默**地不工作。
+def _在岗吗(家):
+    """开窗自检：护栏此刻**真的在岗**吗？在岗返回 None，不在岗返回一句人话。
 
-    ⚠️⚠️ 哨.py 里那段是：
-        try: import yaml
-        except: return []        ← 一条条目都不加载，且**没有任何提示**
-    ⇒ 对新装的人，症状是「装成功了、钩子在跑、日志也有、就是永远不叫」——
-      而这跟「我没犯过规」长得一模一样。⭐ 这正是本套东西自己的头号纪律：
-      **沉默不许有两种含义**。
-    ⇒ 所以在这儿明着报出来，⛔ 不让它悄悄空转。
+    ⚠️⚠️ 引擎加载条目那段是 `try: import yaml / except: return []`
+      ——⇒ **一条规矩都不加载，且没有任何提示**。
+      症状是「装成功了、钩子在跑、日志也有、**就是永远不叫**」，
+      而这跟「我没犯过规」**长得一模一样**。⭐ 沉默不许有两种含义。
+
+    ⭐⭐ 2026-08-16 由 codex 窗独立指出（⛔ 不是本窗自己发现的）：
+      「缺 PyYAML、**规则目录不可读**、**零条合法规则** 必须**分别报明**，
+        ⛔ 不能统一返回空列表。」
+      ⇒ 本窗原来只堵了第一种 ⇒ 另外两种在 v0.4.0 里仍然是静默的。现在三种都报。
     """
     try:
-        import yaml  # noqa: F401
-        return True
+        import yaml
     except Exception:
-        return False
+        return ("缺少 Python 的 pyyaml 包 ⇒ **一条规矩都没加载**。\n"
+                "⇒ 装上即可恢复：`python -m pip install pyyaml`（装完重开一个窗）。")
+
+    生效 = 家 / "active"
+    try:
+        文件们 = sorted(生效.glob("*.yaml"))
+    except Exception as e:                       # 权限/路径坏/盘掉了
+        return ("规矩目录**读不了**（%s）⇒ 一条规矩都没加载。\n"
+                "⇒ 位置：%s" % (e, 生效))
+    if not 文件们:
+        return ("规矩目录里**一个文件都没有** ⇒ 此刻没有任何规矩在生效。\n"
+                "⇒ 位置：%s（删空了？重装插件会把示范条目补回来）" % 生效)
+
+    好 = 坏 = 0
+    for p in 文件们:
+        try:
+            e = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+            if isinstance(e, dict) and e.get("id") and e.get("注入文本"):
+                好 += 1
+            else:
+                坏 += 1
+        except Exception:
+            坏 += 1
+    if 好 == 0:
+        return ("那里有 %d 个文件，但**没有一条能用**（格式不对或写坏了）\n"
+                "⇒ 此刻护栏完全不工作。位置：%s" % (len(文件们), 生效))
+    if 坏:
+        return ("有 %d 条规矩在岗，但另有 **%d 个文件读不懂**（会被静默跳过）\n"
+                "⇒ 检查一下：%s" % (好, 坏, 生效))
+    return None
 
 
 def 主():
     事件 = sys.argv[1] if len(sys.argv) > 1 else ""
-    if not _依赖齐吗():
-        # ⭐ 只在开窗时说一次。⛔ 不在每次工具调用时刷屏——噪音毁信用比不提醒更糟。
-        # ⛔ 也不再往下跑引擎：缺 yaml 时它做不了正事，跑了反而会和这条消息抢标准输出。
-        if 事件 == "SessionStart":
-            print(json.dumps({"hookSpecificOutput": {
-                "hookEventName": "SessionStart",
-                "additionalContext":
-                    "⛔【agent-guardrails 没在岗】缺少 Python 的 pyyaml 包 ⇒ "
-                    "**一条规矩都没加载**，护栏此刻完全不工作。\n"
-                    "⇒ 装上它即可恢复：`python -m pip install pyyaml`（装完重开一个窗）。\n"
-                    "⚠️ 在装好之前，⛔ 别把「没被拦过」当成「我没犯过规」。",
-            }}, ensure_ascii=False))
-        return 0
-
     家 = _状态家()
     try:
         家.mkdir(parents=True, exist_ok=True)
@@ -212,6 +228,34 @@ def 主():
     # ⭐ 同事册：插件形态下它住在数据目录（可写、升级不丢），⛔ 不在引擎目录
     os.environ.setdefault("WORLDBOOK_关系册", str(家 / "关系册.yaml"))
     os.environ.setdefault("WORLDBOOK_工具目录", str(家 / "工具"))
+    # ⭐⭐ 宿主翻译层：告诉引擎「这台宿主的项目配置在哪个目录名下、用户目录在哪」。
+    #   ⇒ **一份引擎跑两个宿主**，⛔ 不复制引擎（本仓原罪就是复制）。
+    #   ⛔ 这里⛔ 不写死 .claude —— 有 codex 的插件根变量就认 codex 的一套。
+    是codex = bool(os.environ.get("PLUGIN_ROOT") and not os.environ.get("CLAUDE_PLUGIN_ROOT"))
+    os.environ.setdefault("WORLDBOOK_配置目录名", ".codex" if 是codex else ".claude")
+    os.environ.setdefault("WORLDBOOK_宿主用户目录",
+                          str(Path(os.environ.get("CODEX_HOME") or (Path.home() / ".codex"))
+                              if 是codex else (Path.home() / ".claude")))
+    # ⭐ 引擎认 CLAUDE_PROJECT_DIR 当显式锚点 ⇒ 在 codex 上把它翻译过去，⛔ 不改引擎
+    if 是codex and not os.environ.get("CLAUDE_PROJECT_DIR"):
+        for k in ("CODEX_PROJECT_DIR", "PROJECT_DIR"):
+            if os.environ.get(k):
+                os.environ["CLAUDE_PROJECT_DIR"] = os.environ[k]
+                break
+
+    # ⭐ 开窗自检：⛔ 不在岗就**明说**，⛔ 不许悄悄空转（沉默不许有两种含义）。
+    #   只在 SessionStart 说一次；⛔ 不在每次工具调用时刷屏——噪音毁信用比不提醒更糟。
+    #   ⛔ 也不再往下跑引擎：这几种情况它做不了正事，跑了反而会和这条消息抢标准输出。
+    if 事件 == "SessionStart":
+        病 = _在岗吗(家)
+        if 病:
+            print(json.dumps({"hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext":
+                    "⛔【agent-guardrails 没在岗】%s\n"
+                    "⚠️ 在修好之前，⛔ 别把「没被拦过」当成「我没犯过规」。" % 病,
+            }}, ensure_ascii=False))
+            return 0
 
     哨 = 插件根 / "engine" / "哨.py"
     if not 哨.is_file():

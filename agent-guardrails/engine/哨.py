@@ -31,6 +31,15 @@ ACTIVE_DIR = Path(os.environ.get("WORLDBOOK_ACTIVE_DIR") or (ROOT / "active"))
 STAGING_DIR = Path(os.environ.get("WORLDBOOK_STAGING_DIR") or (ROOT / "staging"))
 STATE_DIR = Path(os.environ.get("WORLDBOOK_STATE_DIR") or (ROOT / "_state"))
 
+# ⭐⭐ 宿主无关（2026-08-16）：同一份引擎要能跑在不同宿主上
+#   —— Claude Code 的项目配置在 `.claude/`，codex 在 `.codex/`。
+#   ⛔ 别写死其中一个；也⛔ 别在每个引擎里各写一份"依次试"的查找函数
+#     （同一件事判两遍迟早不一致——本仓的原罪就是这个）。
+#   ⇒ 决策**只有一处**：适配层开窗时设好这两个环境变量，引擎照读。
+配置目录 = os.environ.get("WORLDBOOK_配置目录名") or ".claude"
+宿主用户目录 = Path(os.environ.get("WORLDBOOK_宿主用户目录") or (Path.home() / ".claude"))
+
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -338,7 +347,7 @@ def _has_dispatch_cfg(cwd):
     """本项目配没配派单通道 ＝ 有没有 .claude/工作流.yaml（预设表就住那儿）。
     ⭐ 有了它，「该派单」类条目才是全局条目：没接派单基建的项目自动噤声，⛔ 不用靠作用域白名单维护。"""
     try:
-        return (Path(cwd or os.getcwd()) / ".claude" / "工作流.yaml").is_file()
+        return (Path(cwd or os.getcwd()) / 配置目录 / "工作流.yaml").is_file()
     except Exception:
         return False
 
@@ -356,7 +365,7 @@ def _收件目录(cwd):
     """
     try:
         根 = Path(cwd or os.getcwd())
-        f = 根 / ".claude" / "工作流.yaml"
+        f = 根 / 配置目录 / "工作流.yaml"
         rel = "_dev/收件"
         if f.is_file():
             try:
@@ -774,7 +783,7 @@ def _门铃调速器(data, st):
     流水 = _读门铃()
     cfg = {}
     try:
-        f = Path(data.get("cwd") or ".") / ".claude" / "工作流.yaml"
+        f = Path(data.get("cwd") or ".") / 配置目录 / "工作流.yaml"
         if f.is_file():
             import yaml
             cfg = (yaml.safe_load(f.read_text(encoding="utf-8")) or {}).get("门铃") or {}
@@ -915,7 +924,7 @@ def _垫片目录(cwd):
     ⚠️ ⛔ 别去 import 接入.py 里的同名函数——那是安装器，哨每次工具调用都跑，⛔ 不该拖它进来。
     """
     try:
-        f = Path(cwd or os.getcwd()) / ".claude" / "工作流.yaml"
+        f = Path(cwd or os.getcwd()) / 配置目录 / "工作流.yaml"
         if not f.is_file():
             return None
         import yaml
@@ -981,7 +990,7 @@ def _读独占资源(cwd):
       是几十分钟——同一个数不可能同时对。⇒ 裸阈值留在引擎里，就是给每个项目发一个错的基准。
     """
     try:
-        f = Path(cwd or os.getcwd()) / ".claude" / "工作流.yaml"
+        f = Path(cwd or os.getcwd()) / 配置目录 / "工作流.yaml"
         if not f.is_file():
             return []
         import yaml
@@ -1701,7 +1710,7 @@ def do_session_start(data):
             _state_save(data.get("session_id"), st0)
     except Exception:
         _log_error()
-    cfg_path = Path(cwd) / ".claude" / "压缩闸.yaml"
+    cfg_path = Path(cwd) / 配置目录 / "压缩闸.yaml"
     if cfg_path.exists():
         try:
             import yaml

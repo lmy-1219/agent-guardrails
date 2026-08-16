@@ -43,6 +43,15 @@ import sys
 import time
 from pathlib import Path
 
+# ⭐⭐ 宿主无关（2026-08-16）：同一份引擎要能跑在不同宿主上
+#   —— Claude Code 的项目配置在 `.claude/`，codex 在 `.codex/`。
+#   ⛔ 别写死其中一个；也⛔ 别在每个引擎里各写一份"依次试"的查找函数
+#     （同一件事判两遍迟早不一致——本仓的原罪就是这个）。
+#   ⇒ 决策**只有一处**：适配层开窗时设好这两个环境变量，引擎照读。
+配置目录 = os.environ.get("WORLDBOOK_配置目录名") or ".claude"
+宿主用户目录 = Path(os.environ.get("WORLDBOOK_宿主用户目录") or (Path.home() / ".claude"))
+
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
@@ -110,14 +119,14 @@ def _写目标(c):
 def 找项目根(起点):
     p = Path(起点 or os.getcwd()).resolve()
     for d in (p, *p.parents):
-        if (d / ".claude").is_dir():
+        if (d / 配置目录).is_dir():
             return d
     return p
 
 
 def 读配置(项目根):
     cfg = {"项目根": str(项目根), "预设": dict(缺省预设), "真源根": {}, "闸": [], "来源": "内置缺省"}
-    f = Path(项目根) / ".claude" / "工作流.yaml"
+    f = Path(项目根) / 配置目录 / "工作流.yaml"
     if not f.is_file():
         return cfg
     try:

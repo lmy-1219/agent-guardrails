@@ -1,0 +1,59 @@
+{
+  "_待codex核实": "codex 怎么发现本文件？探针用的是 hooks/hooks.json，但那个名字已被 Claude 版占用（语法不同）。⇒ 请核实能否在 .codex-plugin/plugin.json 里声明本文件；不能的话本包要拆成两个。⛔ 本文件未经 codex 实测。",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -X utf8 \"$PLUGIN_ROOT/engine/entry.py\" SessionStart",
+            "commandWindows": "python -X utf8 \"$env:PLUGIN_ROOT/engine/entry.py\" SessionStart",
+            "timeout": 20,
+            "statusMessage": "agent-guardrails SessionStart"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -X utf8 \"$PLUGIN_ROOT/engine/entry.py\" PreToolUse",
+            "commandWindows": "python -X utf8 \"$env:PLUGIN_ROOT/engine/entry.py\" PreToolUse",
+            "timeout": 15,
+            "statusMessage": "agent-guardrails PreToolUse"
+          }
+        ],
+        "matcher": ".*"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -X utf8 \"$PLUGIN_ROOT/engine/entry.py\" PostToolUse",
+            "commandWindows": "python -X utf8 \"$env:PLUGIN_ROOT/engine/entry.py\" PostToolUse",
+            "timeout": 15,
+            "statusMessage": "agent-guardrails PostToolUse"
+          }
+        ],
+        "matcher": ".*"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -X utf8 \"$PLUGIN_ROOT/engine/entry.py\" Stop",
+            "commandWindows": "python -X utf8 \"$env:PLUGIN_ROOT/engine/entry.py\" Stop",
+            "timeout": 20,
+            "statusMessage": "agent-guardrails Stop"
+          }
+        ]
+      }
+    ]
+  }
+}

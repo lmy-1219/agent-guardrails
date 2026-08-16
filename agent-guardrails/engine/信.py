@@ -34,6 +34,15 @@ import sys
 import time
 from pathlib import Path
 
+# ⭐⭐ 宿主无关（2026-08-16）：同一份引擎要能跑在不同宿主上
+#   —— Claude Code 的项目配置在 `.claude/`，codex 在 `.codex/`。
+#   ⛔ 别写死其中一个；也⛔ 别在每个引擎里各写一份"依次试"的查找函数
+#     （同一件事判两遍迟早不一致——本仓的原罪就是这个）。
+#   ⇒ 决策**只有一处**：适配层开窗时设好这两个环境变量，引擎照读。
+配置目录 = os.environ.get("WORLDBOOK_配置目录名") or ".claude"
+宿主用户目录 = Path(os.environ.get("WORLDBOOK_宿主用户目录") or (Path.home() / ".claude"))
+
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
@@ -53,18 +62,18 @@ def _项目根():
     ⇒ 有显式锚点就用显式锚点；cwd 只作最后退路，且**投递时把落点打印出来让人看得见**。
     """
     env = os.environ.get("CLAUDE_PROJECT_DIR")
-    if env and (Path(env) / ".claude").is_dir():
+    if env and (Path(env) / 配置目录).is_dir():
         return Path(env).resolve()
     d = Path.cwd().resolve()
     for p in (d, *d.parents):
-        if (p / ".claude").is_dir():
+        if (p / 配置目录).is_dir():
             return p
     return d
 
 
 def _收件目录(根, 建=False):
     rel = "_dev/收件"
-    f = 根 / ".claude" / "工作流.yaml"
+    f = 根 / 配置目录 / "工作流.yaml"
     if f.is_file():
         try:
             import yaml
@@ -108,7 +117,7 @@ def _解析目标项目(名或路径):
     #     ⭐ 垫片当时已按三级查找改对（模板/垫片_哨.py），本文件漏了。
     兄弟根 = []
     try:
-        册 = Path.home() / ".claude" / "worldbook路径"
+        册 = 宿主用户目录 / "worldbook路径"
         if 册.is_file():
             for 行 in 册.read_text(encoding="utf-8", errors="replace").splitlines():
                 行 = 行.strip()
@@ -121,7 +130,7 @@ def _解析目标项目(名或路径):
         候 += [Path.cwd() / 名, _项目根().parent / 名] + [b / 名 for b in 兄弟根]
     for c in 候:
         try:
-            if (c / ".claude").is_dir():
+            if (c / 配置目录).is_dir():
                 return c.resolve()
         except OSError:
             pass

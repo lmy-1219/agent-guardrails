@@ -1,0 +1,15 @@
+{
+  "name": "agent-guardrails",
+  "version": "0.5.0",
+  "description": "让 AI 编码助手在犯错前被你自己踩过的坑拦一下（不含外部执行器派单）",
+  "author": {
+    "name": "lmy-1219"
+  },
+  "interface": {
+    "displayName": "agent-guardrails",
+    "shortDescription": "动手前用你自己踩过的坑拦一下",
+    "longDescription": "让 AI 编码助手在犯错前被你自己踩过的坑拦一下（不含外部执行器派单）",
+    "developerName": "lmy-1219",
+    "category": "Developer Tools"
+  }
+}

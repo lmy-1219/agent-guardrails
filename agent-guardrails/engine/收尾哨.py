@@ -24,6 +24,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+# ⭐⭐ 宿主无关（2026-08-16）：同一份引擎要能跑在不同宿主上
+#   —— Claude Code 的项目配置在 `.claude/`，codex 在 `.codex/`。
+#   ⛔ 别写死其中一个；也⛔ 别在每个引擎里各写一份"依次试"的查找函数
+#     （同一件事判两遍迟早不一致——本仓的原罪就是这个）。
+#   ⇒ 决策**只有一处**：适配层开窗时设好这两个环境变量，引擎照读。
+配置目录 = os.environ.get("WORLDBOOK_配置目录名") or ".claude"
+宿主用户目录 = Path(os.environ.get("WORLDBOOK_宿主用户目录") or (Path.home() / ".claude"))
+
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -67,7 +76,7 @@ if 问题:
 # ③ 项目附加检查（⛔ 引擎不认识任何项目的账本——项目的归项目，只负责替它跑）
 try:
     import yaml
-    f = 项目根 / ".claude" / "工作流.yaml"
+    f = 项目根 / 配置目录 / "工作流.yaml"
     if f.is_file():
         d = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
         for cmd in d.get("收尾哨附加") or []:

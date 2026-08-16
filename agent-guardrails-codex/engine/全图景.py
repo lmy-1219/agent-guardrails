@@ -25,17 +25,26 @@ import sys
 import time
 from pathlib import Path
 
+# ⭐⭐ 宿主无关（2026-08-16）：同一份引擎要能跑在不同宿主上
+#   —— Claude Code 的项目配置在 `.claude/`，codex 在 `.codex/`。
+#   ⛔ 别写死其中一个；也⛔ 别在每个引擎里各写一份"依次试"的查找函数
+#     （同一件事判两遍迟早不一致——本仓的原罪就是这个）。
+#   ⇒ 决策**只有一处**：适配层开窗时设好这两个环境变量，引擎照读。
+配置目录 = os.environ.get("WORLDBOOK_配置目录名") or ".claude"
+宿主用户目录 = Path(os.environ.get("WORLDBOOK_宿主用户目录") or (Path.home() / ".claude"))
+
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
 def _项目根():
     env = os.environ.get("CLAUDE_PROJECT_DIR")
-    if env and (Path(env) / ".claude").is_dir():
+    if env and (Path(env) / 配置目录).is_dir():
         return Path(env).resolve()
     d = Path.cwd().resolve()
     for p in (d, *d.parents):
-        if (p / ".claude").is_dir():
+        if (p / 配置目录).is_dir():
             return p
     return d
 
@@ -59,7 +68,7 @@ def _找库(根):
         if os.environ.get(k):
             候.append(Path(os.environ[k]))
     try:
-        册 = Path.home() / ".claude" / "worldbook路径"
+        册 = 宿主用户目录 / "worldbook路径"
         if 册.is_file():
             for 行 in 册.read_text(encoding="utf-8", errors="replace").splitlines():
                 行 = 行.strip()
@@ -92,10 +101,10 @@ def _读yaml(p):
 def _转录目录(根):
     """哨侧会话 UUID ＝ 转录文件名（2026-08-13 实测确认）⇒ 脚本能直接枚举会话。
     ⚠️ 但**标题与模型是 CCD 侧的**，脚本拿不到 ⇒ 用首条用户消息当代称，并如实标注这一点。"""
-    d = Path.home() / ".claude" / "projects" / ("F--" + str(根).replace(":", "").replace("\\", "-").replace("/", "-").lstrip("-"))
+    d = 宿主用户目录 / "projects" / ("F--" + str(根).replace(":", "").replace("\\", "-").replace("/", "-").lstrip("-"))
     if d.is_dir():
         return d
-    base = Path.home() / ".claude" / "projects"
+    base = 宿主用户目录 / "projects"
     if base.is_dir():
         名 = 根.name.lower()
         for c in base.iterdir():
@@ -174,7 +183,7 @@ def 生成(根, 简=False):
     if 库:
         接入 = []
         for c in sorted((库.parent).iterdir()) if 库.parent.is_dir() else []:
-            wf = c / ".claude" / "工作流.yaml"
+            wf = c / 配置目录 / "工作流.yaml"
             if c.is_dir() and wf.is_file():
                 d = _读yaml(wf)
                 接入.append((c.name, d.get("垫片目录") or "?", "有信箱" if (c / (d.get("收件目录") or "_dev/收件")).is_dir() else "无信箱"))

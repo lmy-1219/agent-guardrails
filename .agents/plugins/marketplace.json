@@ -1,0 +1,33 @@
+{
+  "_待codex核实": "本货架未经 codex 实测安装。plugins[].source 的写法照探针的 local 形状写，仓库型货架是否需要别的写法请核实并改对。",
+  "name": "guardrails",
+  "interface": {
+    "displayName": "agent-guardrails"
+  },
+  "plugins": [
+    {
+      "name": "agent-guardrails",
+      "source": {
+        "source": "local",
+        "path": "./agent-guardrails"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "agent-guardrails-codex",
+      "source": {
+        "source": "local",
+        "path": "./agent-guardrails-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
