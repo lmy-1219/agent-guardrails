@@ -14,7 +14,7 @@
     {
       "name": "agent-guardrails-codex",
       "source": "./agent-guardrails-codex",
-      "description": "agent-guardrails ＋ 把体力活派给外部执行器（codex）的档位规划通道"
+      "description": "agent-guardrails ＋ 把体力活派给外部执行器（codex）的档位规划通道（⭐ 跑在 Claude Code 里，⛔ 不是 codex 原生版）"
     }
   ]
 }
