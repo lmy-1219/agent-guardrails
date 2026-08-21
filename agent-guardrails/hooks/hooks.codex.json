@@ -1,5 +1,5 @@
 {
-  "description": "agent-guardrails 的四个挂点（codex 宿主）",
+  "description": "agent-guardrails 的五个挂点（codex 宿主）",
   "hooks": {
     "SessionStart": [
       {
@@ -10,6 +10,19 @@
             "commandWindows": "python -X utf8 \"$env:PLUGIN_ROOT/engine/entry.py\" SessionStart",
             "timeout": 20,
             "statusMessage": "agent-guardrails SessionStart"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -X utf8 \"$PLUGIN_ROOT/engine/entry.py\" UserPromptSubmit",
+            "commandWindows": "python -X utf8 \"$env:PLUGIN_ROOT/engine/entry.py\" UserPromptSubmit",
+            "timeout": 15,
+            "statusMessage": "agent-guardrails UserPromptSubmit"
           }
         ]
       }
