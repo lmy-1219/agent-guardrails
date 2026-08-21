@@ -2144,6 +2144,24 @@ def _带许可(e):
     return _填路径(str(e["注入文本"]).strip()) + 许可尾巴
 
 
+# ---------- ⭐⭐ 起子代理的「显式选档」判定（用户 2026-08-20 更正后的拍板） ----------
+# 真事故（用户自述）：主模型 Fable 5 xhigh，20 个**默认继承**的子代理跑完，那一周的配额基本干光。
+# ⇒ 铁律：**继承主模型档的子代理调用，一次都不许静默溜过去**；显式选了档的不拦不扰。
+# 判「显式选了档」：
+#   · Agent/Task 类：tool_input 里带非空 `model`（⛔ subagent_type 不算——它未必钉死档位）
+#   · Workflow：脚本文本里出现 model:/effort: 的显式指定
+#   · codex（collaborationspawn_agent）：带 model / reasoning_effort / agent_type
+#     ⚠️ codex 侧「默认继承时这些字段是否也被填上」**未验** ⇒ 那边可能漏判成"显式"，已列入下一张 codex 验证单
+WORKFLOW显式_RE = re.compile(r"\b(model|effort)\s*:\s*['\"]", re.I)
+
+
+def _spawn选了档(tool_name, data):
+    inp = data.get("tool_input")
+    if not isinstance(inp, dict):
+        return False
+    if "Workflow" in str(tool_name):
+        return bool(WORKFLOW显式_RE.search(str(inp.get("script") or "")))
+    return bool(inp.get("model") or inp.get("reasoning_effort") or inp.get("agent_type"))
 def do_pre_tool_use(data):
     """⭐⭐ 工具**跑之前**拦一次要求自查（自查后原样重发即放行，⛔ 不硬拦）。
 
@@ -2226,7 +2244,7 @@ def do_pre_tool_use(data):
     评估增量 = {}
     for e in entries:
         eid = str(e["id"])
-        if st["counts"].get(eid, 0) >= int(e.get("冷却", 1)):
+        if str(e.get("处置", "拦一次")) != "每轮拦一次" and st["counts"].get(eid, 0) >= int(e.get("冷却", 1)):  # 每轮拦一次的提醒不受冷却剪断
             continue
         tool_re = e.get("工具正则")
         if not tool_re:
@@ -2260,17 +2278,39 @@ def do_pre_tool_use(data):
                 "（同一条命令先建后删，或先前命令建过同一路径）⇒ 放行不拦。\n"
                 "⚠️ 若删的其实不是你建的 ⇒ 停下再核一次。"})
             continue
+        # ⭐ 显式选档放行（配合 处置: 每轮拦一次）：档已经挑了 ⇒ 目的已达成，⛔ 不拦不扰
+        if e.get("显式选档放行") and _spawn选了档(tool_name, data):
+            _记评估(评估增量, eid, "条件挡")
+            continue
         _记评估(评估增量, eid, "命中")
-        先前 = st["counts"].get(eid, 0)
-        st["counts"][eid] = 先前 + 1
-        _log_trigger(eid, "PreToolUse", "%s ← %s" % (tool_name, 命中), sid)
         处置 = str(e.get("处置", "拦一次"))
-        # ⭐⭐ 「拦一次后提醒」阶梯（用户 2026-08-19 拍板：硬拦别超一次，其余用提醒）：
-        #   第 1 次硬拦 → 第 2 次**静默放行**（＝「判定必须起就发第二次」的出口；
-        #   ⛔ 别删这一格：模型刚读完整段拦截文本，紧接着的重发再提醒一遍＝纯噪音）
-        #   → 第 3、4 次**只提醒不拦**（用 提醒文本，缺了退回全文）→ 之后静默。
-        #   ⚠️ 用这个处置的条目 冷却 必须设 4 —— 顶上的冷却闸会在 counts≥冷却 时剪断阶梯。
-        if 处置 == "拦一次" or (处置 == "拦一次后提醒" and 先前 == 0):
+        if 处置 == "每轮拦一次":
+            # ⭐⭐ 用户 2026-08-20 更正后的语义（推翻昨天那版「拦一次后提醒」的阶梯）：
+            #   · **每轮至多硬拦一次**（轮＝一次用户输入到回复完，轮号由 UserPromptSubmit 递增）
+            #   · **会话内至多硬拦 3 次**（counts 只数硬拦）
+            #   · 其余**每一次都提醒**（⛔ 没有静默档）——用户原话：「只要漏掉一次，
+            #     就可能一轮烧掉一半的周配额」⇒ 宁可吵，⛔ 不许漏
+            #   · 拦完原样重发 ⇒ 落进提醒档放行（＝「判定必须起就再拉起」的出口）
+            轮 = int(st.get("轮号") or 0)
+            已拦 = int(st["counts"].get(eid, 0))
+            if (st.get("每轮拦") or {}).get(eid) != 轮 and 已拦 < int(e.get("会话拦截上限", 3)):
+                st["counts"][eid] = 已拦 + 1
+                st.setdefault("每轮拦", {})[eid] = 轮
+                _log_trigger(eid, "PreToolUse", "%s ← %s" % (tool_name, 命中), sid)
+                _合并评估计数(评估增量)
+                _state_save(sid, st)
+                理由 = _带许可(e) + (("\n\n" + 哨提示) if 哨提示 else "")
+                print(json.dumps({"hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": 理由}}, ensure_ascii=False))
+                return
+            _log_trigger(str(eid) + "·提醒", "PreToolUse", "%s ← %s" % (tool_name, 命中), sid)
+            inject.append(dict(e, 注入文本=str(e.get("提醒文本") or e.get("注入文本"))))
+            continue
+        st["counts"][eid] = st["counts"].get(eid, 0) + 1
+        _log_trigger(eid, "PreToolUse", "%s ← %s" % (tool_name, 命中), sid)
+        if 处置 == "拦一次":
             _合并评估计数(评估增量)
             _state_save(sid, st)
             # ⭐ 拦截时把「没人盯着」那句一并带上：被拦的这一刻人正好在看，⛔ 别浪费这次注意力
@@ -2280,10 +2320,6 @@ def do_pre_tool_use(data):
                 "permissionDecision": "deny",
                 "permissionDecisionReason": 理由}}, ensure_ascii=False))
             return            # 一次只拦一条
-        if 处置 == "拦一次后提醒":
-            if 先前 == 1:
-                continue      # 静默放行那一格（出口，⛔ 不是漏）
-            e = dict(e, 注入文本=str(e.get("提醒文本") or e.get("注入文本")))
         inject.append(e)
     段前 = ([哨提示] if 哨提示 else []) + [_带许可(e) for e in inject]
     if 段前:
@@ -2506,6 +2542,8 @@ def do_user_prompt_submit(data):
     cwd = data.get("cwd")
     prompt = str(data.get("prompt") or "")
     st = _state_load(sid)
+    # 轮号：每来一句用户输入 +1。「每轮拦一次」那个处置全靠它分轮（2026-08-20）。
+    st["轮号"] = int(st.get("轮号") or 0) + 1
     段 = []
     评估增量 = {}
 

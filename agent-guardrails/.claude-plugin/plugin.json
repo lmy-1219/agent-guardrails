@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "agent-guardrails",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "让 AI 编码助手在犯错前被你自己踩过的坑拦一下（不含外部执行器派单）",
   "author": {
     "name": "lmy-1219"
